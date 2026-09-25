@@ -1,0 +1,51 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Per-run artifacts: one directory per triage run holding checkpoint.json
+# and audit.jsonl. Reproducible by re-running and unbounded in size.
+runs/
+
+# Logs
+*.log
+logs/
+
+# Generated corpus and indexes. gpu_cluster_failures.xlsx is the source of
+# truth; everything below is build output from scripts/ingest_xlsx.py and
+# scripts/build_index.py.
+data/docs/
+data/chroma/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
