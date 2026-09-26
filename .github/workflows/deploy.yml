@@ -92,5 +92,9 @@ jobs:
 
       - name: Verify
         run: |
-          sleep 5
-          curl -fsS http://44.195.92.119/health
+          # The raw EC2 IP is deliberately unreachable from outside the
+          # security group's allowlist (your IP and CloudFront's range),
+          # which a GitHub-hosted runner is neither of. Checking through
+          # CloudFront instead verifies the actual path real visitors use.
+          sleep 10
+          curl -fsS https://dx1c4iwfxwyxv.cloudfront.net/health
