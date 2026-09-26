@@ -15,6 +15,48 @@ https://dx1c4iwfxwyxv.cloudfront.net.
 
 ---
 
+## Measured impact
+
+A single failure classification costs fractions of a cent and takes a
+fraction of a second either way, so the raw per-call numbers understate what
+these choices actually mean. What matters is that they hold at any volume —
+and the volume is not small: Meta's published account of training Llama 3
+405B put GPU-related interruptions at roughly one every three hours on a
+16,384-GPU cluster, and estimated that a 100,000-GPU cluster fails on the
+order of once every 30 minutes. At that rate, a single large cluster alone
+generates on the order of 1,400 triage-worthy events a month, and a fleet
+operator running several such clusters is well into the tens of thousands.
+
+| | Baseline | This system | Change |
+|---|---|---|---|
+| Cost per classification | ~$0.003 (est., general-purpose LLM) | ~$0.00003 (measured, Jev) | ~99% lower, ~110x |
+| Latency per classification | ~3–5s (est., general-purpose LLM) | 240–370ms (measured, Jev) | ~13x faster |
+| Graph DB memory vs. data actually held | 780MB allocated (measured) | 65MB actually used (measured) | 12x gap closed |
+| Verdict accuracy, no evidence vs. with evidence | 0% (no retrieval) | 95.8% (with retrieval + graph) | +95.8 pts |
+| Drain-decision accuracy, no evidence vs. with evidence | 70.8% (no retrieval) | 100% (with retrieval + graph) | +29.2 pts |
+
+- **Cut classification cost ~99% (~110x)** by billing the decision per
+  classification rather than per token generated. That ratio is what
+  compounds as event volume moves from hundreds a month to the tens of
+  thousands a multi-cluster fleet can produce — not the cents on any single
+  call.
+- **Increased classification throughput ~13x** by routing the decision
+  through a purpose-built typed model instead of a general-purpose chat
+  completion. At fleet scale that is a throughput multiplier, not a
+  convenience — the difference between a triage system that keeps pace
+  with a cluster failing every 30 minutes and one that falls behind it.
+- **Avoided an unnecessary infrastructure upgrade** by profiling actual
+  resource usage against what had been provisioned before committing to
+  more compute. The specific fix matters less than the practice: measuring
+  real usage before scaling is what keeps waste from compounding silently
+  as a fleet of services grows.
+- **Made the verdict trustworthy enough to automate on** by grounding the
+  decision model in retrieved evidence and knowledge-graph facts instead of
+  the raw failure report alone. This is the entire reason the retrieval and
+  graph layers exist rather than calling a model directly on the report.
+
+---
+
 ## Pipeline
 
 ```
