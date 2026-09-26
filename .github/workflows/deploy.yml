@@ -1,19 +1,13 @@
 name: Deploy backend
 
-# Runs on every push to main that touches something the backend image
-# actually depends on. Frontend-only changes don't trigger a rebuild here,
-# since the frontend deploys separately to S3.
+# Runs on every push to main, and can also be triggered by hand from the
+# Actions tab. Rebuilding and restarting the container on a push that only
+# touched, say, the README costs a few seconds of interruption for no
+# benefit, but push-triggers-deploy with no exceptions to remember is worth
+# that cost here.
 on:
   push:
     branches: [main]
-    paths:
-      - "app/**"
-      - "scripts/**"
-      - "Dockerfile"
-      - "requirements.txt"
-      - "gpu_cluster_failures.xlsx"
-  # Lets this be triggered by hand from the Actions tab, for testing the
-  # pipeline itself without needing to make a real code change first.
   workflow_dispatch:
 
 # id-token: write is what lets this workflow request a short lived OIDC
