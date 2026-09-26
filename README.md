@@ -31,7 +31,7 @@ thousands.
 
 | | Baseline | This system | Change |
 |---|---|---|---|
-| Cost (500 calls) | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
+| Cost (per 500 calls) | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
 | Latency (per 500 calls) | ~25–42 min (est., general-purpose LLM) | ~2–3 min (measured, Jev) | ~13x faster |
 | Graph DB memory vs. data actually held | 780MB allocated (measured) | 65MB actually used (measured) | 12x gap closed |
 | Verdict accuracy, no evidence vs. with evidence | 0% (no retrieval) | 95.8% (with retrieval + graph) | +95.8 pts |
