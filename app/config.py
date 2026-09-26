@@ -100,7 +100,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XLSX_PATH = os.path.join(BASE_DIR, "gpu_cluster_failures.xlsx")
 DOCS_DIR = os.path.join(BASE_DIR, "data", "docs")
 CHROMA_DIR = os.path.join(BASE_DIR, "data", "chroma")
-RUNS_DIR = os.path.join(BASE_DIR, "runs")
+# Overridable so run state can be written outside the project tree, for
+# example to a mounted volume in a container.
+RUNS_DIR = os.getenv("RUNS_DIR", os.path.join(BASE_DIR, "runs"))
 
 # --- Server ---
 # Browsers enforce the same origin policy, so a page served from one
@@ -115,6 +117,39 @@ CORS_ORIGINS = [
     ).split(",")
     if o.strip()
 ]
+
+# --- Abuse controls ---
+# Every triage run spends money on two external APIs, so a public endpoint
+# needs a spend ceiling, not just a load limit.
+#
+# The daily budget is the control that actually bounds cost: it caps total
+# runs per day across all callers. The per caller rate limits stop one
+# source consuming that budget in a burst.
+# Longest accepted query. Unbounded input goes straight into two paid
+# models, so the cap is a cost control as much as a validation rule.
+MAX_QUERY_CHARS = int(os.getenv("MAX_QUERY_CHARS", "4000"))
+
+RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "5"))
+RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "30"))
+DAILY_RUN_BUDGET = int(os.getenv("DAILY_RUN_BUDGET", "200"))
+
+# Optional. A caller presenting this in X-API-Key bypasses the rate limit,
+# though not the daily budget. Not a browser secret: a static frontend
+# cannot hold one privately, so this is for programmatic callers and for
+# the operator rather than for authenticating end users.
+API_KEY = os.getenv("API_KEY", "")
+
+# Shared secret between the CDN and this service. When set, requests that
+# do not carry it in X-Origin-Secret are refused, so the service can only be
+# reached through the CDN and cannot be hit directly at its address,
+# bypassing the edge controls. Unlike an API key sent from a browser, this
+# value never leaves the CDN configuration and the server environment.
+ORIGIN_SECRET = os.getenv("ORIGIN_SECRET", "")
+
+# Only trust X-Forwarded-For when a proxy that rewrites it sits in front.
+# The header is caller supplied, so trusting it on a directly reachable
+# service lets any client forge its own rate limit identity.
+TRUST_PROXY_HEADER = os.getenv("TRUST_PROXY_HEADER", "false").lower() == "true"
 
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

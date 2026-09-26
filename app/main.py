@@ -15,23 +15,49 @@ import os
 import time
 
 import queue
+import secrets
 import threading
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.agent import run_triage, _checkpoint_path
 from app.audit import read_trail
 from app.llm import LLMError
-from app.config import RUNS_DIR, CORS_ORIGINS
+from app.config import RUNS_DIR, CORS_ORIGINS, MAX_QUERY_CHARS, ORIGIN_SECRET
+from app import limits
 from app.logging_setup import setup_logging
 
 setup_logging()
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="fleet-triage API")
+
+@app.middleware("http")
+async def require_origin_secret(request: Request, call_next):
+    """
+    Refuses requests that did not come through the CDN.
+
+    The CDN is configured to add X-Origin-Secret to everything it forwards.
+    Without this check the service is reachable directly at its address,
+    which would bypass any rate limiting or filtering applied at the edge.
+
+    Disabled when ORIGIN_SECRET is unset, so local runs need no extra
+    configuration. /health is exempt because platform health checks reach
+    the instance directly rather than through the CDN.
+    """
+    if ORIGIN_SECRET and request.url.path != "/health":
+        supplied = request.headers.get("x-origin-secret", "")
+        if not secrets.compare_digest(supplied, ORIGIN_SECRET):
+            log.warning(
+                "rejected direct request to %s from %s",
+                request.url.path, request.client.host if request.client else "?",
+            )
+            return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,14 +76,39 @@ class TriageRequest(BaseModel):
     run_id: str | None = None  # pass this back to resume a crashed run
 
 
-@app.post("/triage")
-async def triage(req: TriageRequest):
-    if not req.query.strip():
+def _guard(request: Request, api_key: str | None, query: str) -> None:
+    """
+    Validates the request and applies the abuse controls, raising the
+    appropriate HTTP error if it should not proceed.
+    """
+    if not query.strip():
         raise HTTPException(400, "query must not be empty")
-    # run_triage does blocking IO (embeddings, Neo4j, the LLM call), so it
+    if len(query) > MAX_QUERY_CHARS:
+        raise HTTPException(
+            413, f"query must be at most {MAX_QUERY_CHARS} characters"
+        )
+    rejection = limits.check(request, api_key=api_key)
+    if rejection:
+        headers = (
+            {"Retry-After": str(rejection.retry_after)}
+            if rejection.retry_after
+            else None
+        )
+        log.info("rejected %s: %s", limits.client_key(request), rejection.detail)
+        raise HTTPException(rejection.status, rejection.detail, headers=headers)
+
+
+@app.post("/triage")
+async def triage(
+    req: TriageRequest,
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+):
+    _guard(request, x_api_key, req.query)
+
+    # run_triage does blocking IO (embeddings, Neo4j, the model calls), so it
     # runs in a worker thread and the event loop stays free for other
-    # requests, which is the "async programming" expectation in the JD
-    # applied to something that actually matters here.
+    # requests.
     t0 = time.time()
     log.info(
         "POST /triage query_chars=%d resume=%s", len(req.query), bool(req.run_id)
@@ -86,7 +137,11 @@ def _sse(event: str, data: dict) -> str:
 
 
 @app.post("/triage/stream")
-async def triage_stream(req: TriageRequest):
+async def triage_stream(
+    req: TriageRequest,
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+):
     """
     Same pipeline as /triage, streamed as Server-Sent Events.
 
@@ -98,8 +153,7 @@ async def triage_stream(req: TriageRequest):
     The run itself happens on a worker thread and communicates through a
     queue; the generator only forwards frames.
     """
-    if not req.query.strip():
-        raise HTTPException(400, "query must not be empty")
+    _guard(request, x_api_key, req.query)
 
     events: queue.Queue = queue.Queue()
     SENTINEL = object()
@@ -168,4 +222,8 @@ async def get_audit(run_id: str):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """
+    Liveness plus current budget consumption. Not rate limited, because
+    platform health checks call it continuously.
+    """
+    return {"status": "ok", **limits.usage()}

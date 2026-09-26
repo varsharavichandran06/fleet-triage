@@ -1,0 +1,33 @@
+# Secrets must never enter the image. Configuration is supplied at runtime.
+.env
+.env.*
+!.env.example
+
+# Build output regenerated inside the image from the workbook.
+data/
+runs/
+
+# Frontend is deployed separately as a static export.
+frontend/
+
+# VCS and local tooling
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docs and OS noise
+README.md
+*.md
+.DS_Store
+Thumbs.db
