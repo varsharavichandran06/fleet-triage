@@ -1,0 +1,94 @@
+name: Deploy backend
+
+# Runs on every push to main that touches something the backend image
+# actually depends on. Frontend-only changes don't trigger a rebuild here,
+# since the frontend deploys separately to S3.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/**"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "gpu_cluster_failures.xlsx"
+
+# id-token: write is what lets this workflow request a short lived OIDC
+# token and exchange it for AWS credentials, with no AWS access key ever
+# stored in GitHub.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: fleet-triage
+  EC2_INSTANCE_ID: i-090aff2aefa7acb0f
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          # Tagged with the commit SHA too, so a specific build can always
+          # be identified or rolled back to, not just whatever "latest"
+          # happens to point at.
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          docker build \
+            -t "$REGISTRY/$ECR_REPOSITORY:latest" \
+            -t "$REGISTRY/$ECR_REPOSITORY:$SHA_TAG" \
+            .
+          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
+          docker push "$REGISTRY/$ECR_REPOSITORY:$SHA_TAG"
+
+      - name: Deploy on EC2 via SSM
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          # Same three commands run manually throughout this project's
+          # setup: pull, replace the container, run it. -f on rm makes this
+          # safe to run even if the container isn't there (a fresh instance,
+          # or a previous deploy that failed partway through).
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:latest"
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[\"docker pull $IMAGE\",\"docker rm -f fleet-triage || true\",\"docker run -d --name fleet-triage --restart unless-stopped -p 80:8000 -v /home/ssm-user/data:/data --env-file /home/ssm-user/.env $IMAGE\"]" \
+            --query "Command.CommandId" --output text)
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" || true
+
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID" \
+            --query "Status" --output text)
+          echo "deploy status: $STATUS"
+
+          # Without this, a failed docker run on the instance would still
+          # show as a green checkmark in GitHub, since send-command itself
+          # succeeded even though the thing it ran did not.
+          if [ "$STATUS" != "Success" ]; then
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" --instance-id "$EC2_INSTANCE_ID"
+            exit 1
+          fi
+
+      - name: Verify
+        run: |
+          sleep 5
+          curl -fsS http://44.195.92.119/health
