@@ -10,6 +10,9 @@ The question it answers is the one that costs money to get wrong: is this a
 documented known issue, a new failure worth escalating, a bug in the
 workload, or an artifact of the test setup — and should the node be drained?
 
+**Live:** UI at https://d2g92amvr8fh0b.cloudfront.net, API at
+https://dx1c4iwfxwyxv.cloudfront.net.
+
 ---
 
 ## Pipeline
@@ -146,6 +149,38 @@ frontend/            Next.js interface showing every pipeline stage
 
 ---
 
+## Deployment
+
+The backend runs as a Docker container on a single EC2 instance, reached
+only through CloudFront: a custom origin header, checked on every request,
+means the instance refuses anything that did not come through the CDN, and
+the security group only accepts inbound traffic from CloudFront's own IP
+range. The instance has no SSH key and no open management port — it is
+reached through SSM Session Manager, authenticated by IAM rather than a
+credential that can be lost or leaked.
+
+The knowledge graph runs on Neo4j AuraDB rather than a container beside the
+app: a self-hosted graph for data this size cost more in JVM overhead than
+the data itself occupies. The frontend is a static export served from S3
+through a second, independent CloudFront distribution, kept separate from
+the API distribution so a caching policy tuned for one can never leak into
+the other.
+
+Deployment is automated: pushing to `main` builds the image, pushes it to
+ECR, and redeploys the running container over SSM, all authenticated
+through GitHub's OIDC federation rather than a stored AWS key.
+
+## Security
+
+The API has no user accounts — a static frontend cannot hold a secret a
+browser can't read back, so "auth" here means abuse resistance rather than
+login. Three things bound it: a daily cap on total runs across every
+caller, a per-caller rate limit, and a maximum query length, since
+unbounded input goes straight into two paid model calls. An optional API
+key lets a caller bypass the per-caller limit, though never the daily cap;
+it is not sent by the browser UI and is not a browser-held secret. CORS
+lists allowed origins explicitly rather than a wildcard.
+
 ## Configuration
 
 Set in `.env`; see `.env.example`. Tuning constants live in `app/config.py`:
@@ -163,4 +198,9 @@ logs prompts and retrieved text, which may contain document contents.
   blocklist to suppress hub entities rather than on a typed schema.
 - Chroma runs embedded and in-process, so the service does not scale
   horizontally as written.
-- There is no authentication or rate limiting on the API.
+- Rate limiting and the daily budget are held in memory on the single
+  instance; they reset on restart and would not be shared across replicas
+  if the service were ever scaled beyond one.
+- There are no user accounts. The controls in Security bound abuse of a
+  public endpoint; they are not identity or access control for the data
+  itself.
