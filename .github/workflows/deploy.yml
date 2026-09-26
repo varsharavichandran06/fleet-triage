@@ -12,6 +12,9 @@ on:
       - "Dockerfile"
       - "requirements.txt"
       - "gpu_cluster_failures.xlsx"
+  # Lets this be triggered by hand from the Actions tab, for testing the
+  # pipeline itself without needing to make a real code change first.
+  workflow_dispatch:
 
 # id-token: write is what lets this workflow request a short lived OIDC
 # token and exchange it for AWS credentials, with no AWS access key ever
