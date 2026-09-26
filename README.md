@@ -29,10 +29,10 @@ alone generates on the order of 1,400 triage-worthy events a month, and a
 fleet operator running several such clusters is well into the tens of
 thousands.
 
-| | Baseline (500 calls) | This system (500 calls) | Change |
+| | Baseline | This system | Change |
 |---|---|---|---|
-| Cost | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
-| Latency (cumulative) | ~25–42 min (est., general-purpose LLM) | ~2–3 min (measured, Jev) | ~13x faster |
+| Cost (500 calls) | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
+| Latency (per 500 calls) | ~25–42 min (est., general-purpose LLM) | ~2–3 min (measured, Jev) | ~13x faster |
 | Graph DB memory vs. data actually held | 780MB allocated (measured) | 65MB actually used (measured) | 12x gap closed |
 | Verdict accuracy, no evidence vs. with evidence | 0% (no retrieval) | 95.8% (with retrieval + graph) | +95.8 pts |
 | Drain-decision accuracy, no evidence vs. with evidence | 70.8% (no retrieval) | 100% (with retrieval + graph) | +29.2 pts |
