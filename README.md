@@ -18,19 +18,21 @@ https://dx1c4iwfxwyxv.cloudfront.net.
 ## Measured impact
 
 A single failure classification costs fractions of a cent and takes a
-fraction of a second either way, so the raw per-call numbers understate what
-these choices actually mean. What matters is that they hold at any volume —
-and the volume is not small: Meta's published account of training Llama 3
-405B put GPU-related interruptions at roughly one every three hours on a
-16,384-GPU cluster, and estimated that a 100,000-GPU cluster fails on the
-order of once every 30 minutes. At that rate, a single large cluster alone
-generates on the order of 1,400 triage-worthy events a month, and a fleet
-operator running several such clusters is well into the tens of thousands.
+fraction of a second either way, so per-call numbers understate what these
+choices actually mean — the table below shows them at a batch of 500
+classifications instead. What matters is that the ratios hold at any
+volume, and the volume is not small: Meta's published account of training
+Llama 3 405B put GPU-related interruptions at roughly one every three hours
+on a 16,384-GPU cluster, and estimated that a 100,000-GPU cluster fails on
+the order of once every 30 minutes. At that rate, a single large cluster
+alone generates on the order of 1,400 triage-worthy events a month, and a
+fleet operator running several such clusters is well into the tens of
+thousands.
 
-| | Baseline | This system | Change |
+| | Baseline (500 calls) | This system (500 calls) | Change |
 |---|---|---|---|
-| Cost per classification | ~$0.003 (est., general-purpose LLM) | ~$0.00003 (measured, Jev) | ~99% lower, ~110x |
-| Latency per classification | ~3–5s (est., general-purpose LLM) | 240–370ms (measured, Jev) | ~13x faster |
+| Cost | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
+| Latency (cumulative) | ~25–42 min (est., general-purpose LLM) | ~2–3 min (measured, Jev) | ~13x faster |
 | Graph DB memory vs. data actually held | 780MB allocated (measured) | 65MB actually used (measured) | 12x gap closed |
 | Verdict accuracy, no evidence vs. with evidence | 0% (no retrieval) | 95.8% (with retrieval + graph) | +95.8 pts |
 | Drain-decision accuracy, no evidence vs. with evidence | 70.8% (no retrieval) | 100% (with retrieval + graph) | +29.2 pts |
