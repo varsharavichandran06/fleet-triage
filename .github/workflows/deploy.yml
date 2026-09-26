@@ -28,6 +28,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Temporary: decodes the OIDC token's own claims and prints the ones
+      # a trust policy condition actually checks. Nothing here is secret;
+      # these are exactly the values meant to be compared against a policy.
+      # Remove once the OIDC trust issue is diagnosed.
+      - name: Debug - decode OIDC token claims
+        run: |
+          RESP=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+          TOKEN=$(echo "$RESP" | jq -r '.value')
+          if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
+            echo "Failed to obtain a token. Raw response:"
+            echo "$RESP"
+            exit 1
+          fi
+          echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{iss, aud, sub, repository, repository_owner, ref, ref_type, workflow_ref}'
+
       - name: Assume the deploy role
         uses: aws-actions/configure-aws-credentials@v4
         with:

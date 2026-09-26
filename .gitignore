@@ -11,6 +11,11 @@ runs/
 *.log
 logs/
 
+# Generated report exports (e.g. fleet-triage-technical-report.docx),
+# not source material.
+*.docx
+*.pdf
+
 # Generated corpus and indexes. gpu_cluster_failures.xlsx is the source of
 # truth; everything below is build output from scripts/ingest_xlsx.py and
 # scripts/build_index.py.
