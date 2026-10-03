@@ -122,7 +122,7 @@ async def triage(
         log.error("POST /triage failed after %.2fs: %s", time.time() - t0, e)
         raise HTTPException(502, f"LLM unavailable: {e}") from e
 
-    verdict = (result.get("verdict") or {}).get("verdict")
+    verdict = (result.get("verdict") or {}).get("root_cause")
     log.info(
         "POST /triage ok run_id=%s verdict=%s chunks=%d facts=%d total=%.2fs",
         result.get("run_id"), verdict, len(result.get("chunks", [])),

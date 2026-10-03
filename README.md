@@ -31,8 +31,12 @@ thousands.
 | Cost (per 500 calls) | ~$1.65 (est., general-purpose LLM) | ~$0.015 (measured, Jev) | ~99% lower, ~110x |
 | Latency (per 500 calls) | ~25–42 min (est., general-purpose LLM) | ~2–3 min (measured, Jev) | ~13x faster |
 | Graph DB memory vs. data actually held | 780MB allocated (measured) | 65MB actually used (measured) | 12x gap closed |
-| Verdict accuracy, no evidence vs. with evidence | 0% (no retrieval) | 95.8% (with retrieval + graph) | +95.8 pts |
-| Drain-decision accuracy, no evidence vs. with evidence | 70.8% (no retrieval) | 100% (with retrieval + graph) | +29.2 pts |
+| Root-cause accuracy, no evidence vs. with evidence | 56.7% (no retrieval) | 100% (with retrieval + graph) | +43.3 pts |
+| Drain decision F1, no evidence vs. with evidence | 0.77 (no retrieval) | 1.00 (with retrieval + graph) | +0.23 |
+
+The two accuracy and F1 figures come from 60 incidents in the synthetic corpus,
+where every incident cites the known issue that states its cause. They show the
+pipeline works on this corpus. They do not show performance on real failures.
 
 - **Cut classification cost ~99% (~110x)** by billing the decision per
   classification rather than per token generated. That ratio is what
@@ -108,10 +112,15 @@ xid 48 → double bit ECC error → RMA
 The verdict is a typed value, not prose:
 
 ```python
-verdict     Choice  known_issue | new_issue | user_code | test_artifact
+root_cause  Choice  hardware | workload | infrastructure | inconclusive
+known_issue Noul    probability the failure is already documented
 drain_node  Noul    probability that the node should leave the scheduler
 severity    Score   ordered rubric
 ```
+
+The root cause is one label per report, since each answers where the fault is.
+Whether the failure is already documented is a separate question, so a workload
+bug can also be a known issue.
 
 Backed by TypeSafe Jev through OpenRouter, with the chat model and a checked
 JSON contract as a fallback when no key is configured. Classification runs

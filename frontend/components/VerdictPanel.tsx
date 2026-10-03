@@ -3,27 +3,27 @@
 import { useState } from "react";
 import type { Verdict } from "@/lib/api";
 
-// Colour and label for each verdict. An unrecognised verdict uses the neutral style below.
-const VERDICT_TONE: Record<string, { label: string; cls: string; dot: string }> = {
-  known_issue: {
-    label: "Known issue",
-    cls: "border-emerald-300 bg-emerald-50 text-emerald-900",
-    dot: "bg-emerald-500",
+// Label and colour for each root cause. An unrecognised value uses the neutral style.
+const ROOT_CAUSE_TONE: Record<string, { label: string; cls: string; dot: string }> = {
+  hardware: {
+    label: "Hardware fault",
+    cls: "border-rose-300 bg-rose-50 text-rose-900",
+    dot: "bg-rose-500",
   },
-  new_issue: {
-    label: "New issue - escalate",
-    cls: "border-amber-300 bg-amber-50 text-amber-900",
-    dot: "bg-amber-500",
-  },
-  user_code: {
+  workload: {
     label: "Workload bug",
     cls: "border-sky-300 bg-sky-50 text-sky-900",
     dot: "bg-sky-500",
   },
-  test_artifact: {
-    label: "Test rig artifact",
-    cls: "border-violet-300 bg-violet-50 text-violet-900",
-    dot: "bg-violet-500",
+  infrastructure: {
+    label: "Infrastructure",
+    cls: "border-amber-300 bg-amber-50 text-amber-900",
+    dot: "bg-amber-500",
+  },
+  inconclusive: {
+    label: "Inconclusive",
+    cls: "border-neutral-300 bg-neutral-50 text-neutral-900",
+    dot: "bg-neutral-500",
   },
 };
 
@@ -59,8 +59,8 @@ function Json({ value }: { value: unknown }) {
 export default function VerdictPanel({ v }: { v: Verdict }) {
   const [tab, setTab] = useState<"in" | "out">("in");
 
-  const tone = VERDICT_TONE[v.verdict] ?? {
-    label: v.verdict,
+  const tone = ROOT_CAUSE_TONE[v.root_cause] ?? {
+    label: v.root_cause,
     cls: "border-neutral-300 bg-neutral-50 text-neutral-900",
     dot: "bg-neutral-500",
   };
@@ -85,6 +85,14 @@ export default function VerdictPanel({ v }: { v: Verdict }) {
         </div>
 
         <div className="mt-3 flex flex-wrap gap-4 text-[11px]">
+          {v.known_issue !== null && (
+            <span>
+              <span className="opacity-70">already documented: </span>
+              <span className="font-semibold tabular-nums">
+                {v.known_issue < 0.5 ? "no" : "yes"} ({v.known_issue.toFixed(2)})
+              </span>
+            </span>
+          )}
           {v.drain_node !== null && (
             <span>
               <span className="opacity-70">drain the node: </span>
@@ -118,7 +126,7 @@ export default function VerdictPanel({ v }: { v: Verdict }) {
               key={k}
               label={k}
               value={p}
-              tone={k === v.verdict ? "bg-neutral-900" : "bg-neutral-400"}
+              tone={k === v.root_cause ? "bg-neutral-900" : "bg-neutral-400"}
             />
           ))}
         </div>

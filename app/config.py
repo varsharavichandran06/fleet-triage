@@ -28,12 +28,19 @@ JEV_BASE_URL = os.getenv("JEV_BASE_URL", "https://openrouter.ai/api")
 # changes version invalidates accuracy measured against the previous one.
 JEV_MODEL = os.getenv("JEV_MODEL", "jev-1.13")
 
+# Ordered severity scale for the Score question. Index 0 is the first entry;
+# the model's score is a probability-weighted position on this index scale.
+SEVERITY_LEVELS = ["Low", "Medium", "High", "Critical"]
+
 # The verdicts the triage step is allowed to return.
-VERDICTS = {
-    "known_issue": "Matches a documented known issue in the retrieved evidence",
-    "new_issue": "A real failure with no matching known issue, worth escalating",
-    "user_code": "A bug in the workload rather than the hardware",
-    "test_artifact": "A test rig, harness or measurement problem, not the product",
+# Root cause of a failure. One label per report: the four are mutually
+# exclusive because each answers "where is the fault", and whether the
+# failure is already documented is asked separately (known_issue).
+ROOT_CAUSES = {
+    "hardware": "The fault is in the GPU or the hardware attached to it (GPU memory, the GPU itself, NVLink, PCIe). The node should be drained and repaired.",
+    "workload": "The fault comes from the job's own code or configuration and would follow the job to other machines. The node should stay in service.",
+    "infrastructure": "The fault is in the surrounding system: power, cooling, network fabric, storage, host, scheduler, or driver and firmware configuration.",
+    "inconclusive": "The evidence does not establish a cause. Investigate before acting on the node.",
 }
 
 # --- Neo4j ---

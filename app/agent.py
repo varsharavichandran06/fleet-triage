@@ -186,7 +186,7 @@ def run_triage(
         verdict = classify(query, data["chunks"], data["graph_facts"])
         log.info(
             "[%s] step 3 decide done: verdict=%s confidence=%.2f drain=%s via %s in %.3fs",
-            run_id[:8], verdict.verdict, verdict.confidence,
+            run_id[:8], verdict.root_cause, verdict.confidence,
             verdict.drain_node, verdict.backend, time.time() - t0,
         )
         data["verdict"] = verdict.as_dict()
@@ -196,7 +196,7 @@ def run_triage(
         _save_checkpoint(run_id, checkpoint)
         log_event(
             run_id, "decide",
-            {"duration_s": round(time.time() - t0, 3), "verdict": verdict.verdict,
+            {"duration_s": round(time.time() - t0, 3), "root_cause": verdict.root_cause,
              "confidence": verdict.confidence, "backend": verdict.backend},
         )
     else:

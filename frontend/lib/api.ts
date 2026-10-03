@@ -72,7 +72,8 @@ export type GraphFact = {
 // The typed decision from the System One model. Carries the request that
 // produced it so the UI can show the mechanism, not just the conclusion.
 export type Verdict = {
-  verdict: string;
+  root_cause: string;
+  known_issue: number | null;
   confidence: number;
   probabilities: Record<string, number>;
   drain_node: number | null;

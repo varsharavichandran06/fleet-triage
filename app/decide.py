@@ -35,7 +35,8 @@ from app.config import (
     OPENROUTER_API_KEY,
     JEV_BASE_URL,
     JEV_MODEL,
-    VERDICTS,
+    ROOT_CAUSES,
+    SEVERITY_LEVELS,
     LLM_MODEL,
     DRY_RUN,
 )
@@ -43,7 +44,7 @@ from app.config import (
 
 @dataclass
 class Verdict:
-    verdict: str
+    root_cause: str
     confidence: float
     probabilities: dict = field(default_factory=dict)
     # Probability that the node should be pulled from the scheduler. The
@@ -51,6 +52,7 @@ class Verdict:
     # fault that lives in the workload, so this is worth its own signal.
     drain_node: Optional[float] = None
     severity: Optional[float] = None
+    known_issue: Optional[float] = None
     backend: str = "none"
     latency_ms: Optional[float] = None
     error: Optional[str] = None
@@ -85,12 +87,83 @@ def _state(query: str, chunks: List[dict], graph_facts: List[dict]) -> dict:
     }
 
 
+ROOT_CAUSE_INSTRUCTIONS = (
+    "Identify the single most likely root cause of the failure report, "
+    "based on the retrieved evidence."
+)
+KNOWN_INSTRUCTIONS = (
+    "Is this failure already documented in the retrieved evidence?"
+)
+KNOWN_CRITERIA = {
+    "true": "The evidence describes this same failure mode and how it was resolved",
+    "false": "No retrieved document describes this failure mode",
+}
+DRAIN_INSTRUCTIONS = "Should the affected node be drained from the scheduler?"
+DRAIN_CRITERIA = {
+    "true": "A hardware fault is likely, so draining prevents further job loss",
+    "false": "The fault is in the workload or the test setup, so draining wastes capacity",
+}
+SEVERITY_INSTRUCTIONS = "How urgent is this failure for the fleet?"
+
+
+def _question_spec() -> dict:
+    """
+    The questions as plain data. This is the only definition: the SDK
+    question objects are built from it, and the same dict is returned to
+    the UI, so what is displayed is exactly what was sent.
+    """
+    return {
+        "root_cause": {
+            "type": "choice",
+            "instructions": ROOT_CAUSE_INSTRUCTIONS,
+            "criteria": dict(ROOT_CAUSES),
+        },
+        "known_issue": {
+            "type": "noul",
+            "instructions": KNOWN_INSTRUCTIONS,
+            "criteria": dict(KNOWN_CRITERIA),
+        },
+        "drain_node": {
+            "type": "noul",
+            "instructions": DRAIN_INSTRUCTIONS,
+            "criteria": dict(DRAIN_CRITERIA),
+        },
+        "severity": {
+            "type": "score",
+            "instructions": SEVERITY_INSTRUCTIONS,
+            "criteria": list(SEVERITY_LEVELS),
+        },
+    }
+
+
+def _sdk_questions(spec: dict) -> dict:
+    """Builds the typesafe_sdk question objects from the plain spec."""
+    from typesafe_sdk import Choice, Noul, NoulCriteria, Score
+
+    return {
+        "root_cause": Choice(
+            instructions=spec["root_cause"]["instructions"],
+            criteria=spec["root_cause"]["criteria"],
+        ),
+        "known_issue": Noul(
+            instructions=spec["known_issue"]["instructions"],
+            criteria=NoulCriteria(**spec["known_issue"]["criteria"]),
+        ),
+        "drain_node": Noul(
+            instructions=spec["drain_node"]["instructions"],
+            criteria=NoulCriteria(**spec["drain_node"]["criteria"]),
+        ),
+        "severity": Score(
+            instructions=spec["severity"]["instructions"],
+            criteria=spec["severity"]["criteria"],
+        ),
+    }
+
+
 def _decide_with_jev(state: dict) -> Verdict:
     import time
 
-    from typesafe_sdk import (
-        Choice, Noul, NoulCriteria, RetryPolicy, Score, TypeSafeClient,
-    )
+    from typesafe_sdk import RetryPolicy, TypeSafeClient
 
     # Bounded. The model normally answers in 240-370ms, but a provider tail
     # event was measured at 10.8s against an unbounded client, which the
@@ -103,51 +176,8 @@ def _decide_with_jev(state: dict) -> Verdict:
         retry=RetryPolicy(max_retries=JEV_MAX_RETRIES),
     )
 
-    # Plain dict mirror of the questions, built alongside the SDK objects so
-    # the UI can render precisely what was asked without reaching into the
-    # SDK's internals.
-    questions_repr = {
-        "verdict": {
-            "type": "choice",
-            "instructions": "Classify the failure report against the retrieved evidence.",
-            "criteria": dict(VERDICTS),
-        },
-        "drain_node": {
-            "type": "noul",
-            "instructions": "Should the affected node be drained from the scheduler?",
-            "criteria": {
-                "true": "A hardware fault is likely, so draining prevents further job loss",
-                "false": "The fault is in the workload or the test setup, so draining wastes capacity",
-            },
-        },
-        "severity": {
-            "type": "score",
-            "instructions": "How urgent is this failure for the fleet?",
-            "criteria": ["Low", "Medium", "High", "Critical"],
-        },
-    }
-
-    questions = {
-        "verdict": Choice(
-            instructions=(
-                "Classify the failure report against the retrieved evidence. "
-                "Prefer known_issue only when the evidence actually documents "
-                "this failure mode."
-            ),
-            criteria=dict(VERDICTS),
-        ),
-        "drain_node": Noul(
-            instructions="Should the affected node be drained from the scheduler?",
-            criteria=NoulCriteria(
-                true="A hardware fault is likely, so draining prevents further job loss",
-                false="The fault is in the workload or the test setup, so draining wastes capacity",
-            ),
-        ),
-        "severity": Score(
-            instructions="How urgent is this failure for the fleet?",
-            criteria=["Low", "Medium", "High", "Critical"],
-        ),
-    }
+    questions_repr = _question_spec()
+    questions = _sdk_questions(questions_repr)
 
     log.debug(
         "jev request: model=%s timeout=%ss retries=%s state_bytes=%d questions=%s",
@@ -162,7 +192,7 @@ def _decide_with_jev(state: dict) -> Verdict:
     if latency > JEV_TIMEOUT_S * 400:
         log.warning("jev slow response: %.0fms (model=%s)", latency, JEV_MODEL)
 
-    v = response.answers["verdict"]
+    v = response.answers["root_cause"]
 
     raw = {}
     for name, ans in response.answers.items():
@@ -174,7 +204,8 @@ def _decide_with_jev(state: dict) -> Verdict:
         raw[name] = entry
 
     return Verdict(
-        verdict=v.choice,
+        root_cause=v.choice,
+        known_issue=float(response.answers["known_issue"].noul),
         confidence=float(getattr(v, "confidence", 0.0) or 0.0),
         probabilities=dict(getattr(v, "probabilities", {}) or {}),
         drain_node=float(response.answers["drain_node"].noul),
@@ -198,11 +229,11 @@ Retrieved evidence:
 Knowledge graph facts:
 {facts}
 
-Choose exactly one verdict from:
+Choose exactly one root cause from:
 {options}
 
 Respond with ONLY a JSON object, no prose:
-{{"verdict": "<one of the options>", "confidence": <0..1>, "drain_node": <0..1>, "severity": <0..1>}}
+{{"root_cause": "<one of the options>", "known_issue": <0..1>, "confidence": <0..1>, "drain_node": <0..1>, "severity": <0..1>}}
 """
 
 
@@ -216,7 +247,7 @@ def _decide_with_llm(state: dict) -> Verdict:
         or "none"
     )
     facts = "\n".join(f"- {f}" for f in state["knowledge_graph_facts"]) or "none"
-    options = "\n".join(f"- {k}: {v}" for k, v in VERDICTS.items())
+    options = "\n".join(f"- {k}: {v}" for k, v in ROOT_CAUSES.items())
 
     prompt = _LLM_PROMPT.format(
         report=state["failure_report"], evidence=evidence, facts=facts, options=options
@@ -234,24 +265,24 @@ def _decide_with_llm(state: dict) -> Verdict:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         return Verdict(
-            verdict="new_issue", confidence=0.0, backend=f"llm:{LLM_MODEL}",
+            root_cause="inconclusive", confidence=0.0, backend=f"llm:{LLM_MODEL}",
             latency_ms=round(latency, 1), error="no JSON object in response",
         )
     try:
         data = json.loads(match.group(0))
     except json.JSONDecodeError as e:
         return Verdict(
-            verdict="new_issue", confidence=0.0, backend=f"llm:{LLM_MODEL}",
+            root_cause="inconclusive", confidence=0.0, backend=f"llm:{LLM_MODEL}",
             latency_ms=round(latency, 1), error=f"malformed JSON: {e}",
         )
 
-    verdict = str(data.get("verdict", "")).strip()
+    root_cause = str(data.get("root_cause", "")).strip()
     error = None
-    if verdict not in VERDICTS:
+    if root_cause not in ROOT_CAUSES:
         # The contract is checked, not guaranteed. This is the difference
         # between a constrained decoder and a typed decision model.
-        error = f"model returned an off-contract verdict: {verdict!r}"
-        verdict = "new_issue"
+        error = f"model returned an off-contract root cause: {root_cause!r}"
+        root_cause = "inconclusive"
 
     def num(key):
         try:
@@ -260,7 +291,8 @@ def _decide_with_llm(state: dict) -> Verdict:
             return None
 
     return Verdict(
-        verdict=verdict,
+        root_cause=root_cause,
+        known_issue=num("known_issue"),
         confidence=num("confidence") or 0.0,
         probabilities={},
         drain_node=num("drain_node"),
@@ -282,7 +314,7 @@ def classify(query: str, chunks: List[dict], graph_facts: List[dict]) -> Verdict
     """
     if DRY_RUN:
         log.info("decide: DRY_RUN, returning a canned verdict")
-        return Verdict(verdict="new_issue", confidence=0.0, backend="dry_run")
+        return Verdict(root_cause="inconclusive", confidence=0.0, backend="dry_run")
 
     state = _state(query, chunks, graph_facts)
     if OPENROUTER_API_KEY:
@@ -290,7 +322,7 @@ def classify(query: str, chunks: List[dict], graph_facts: List[dict]) -> Verdict
             v = _decide_with_jev(state)
             log.info(
                 "decide: %s confidence=%.2f drain=%s severity=%s via %s in %.0fms",
-                v.verdict, v.confidence, v.drain_node, v.severity,
+                v.root_cause, v.confidence, v.drain_node, v.severity,
                 v.backend, v.latency_ms or 0,
             )
             payload(log, "jev answers", v.raw_answers)
