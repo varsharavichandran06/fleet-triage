@@ -10,9 +10,6 @@ The question it answers is the one that costs money to get wrong: is this a
 documented known issue, a new failure worth escalating, a bug in the
 workload, or an artifact of the test setup — and should the node be drained?
 
-**Live:** UI at https://d2g92amvr8fh0b.cloudfront.net, API at
-https://dx1c4iwfxwyxv.cloudfront.net.
-
 ---
 
 ## Measured impact
