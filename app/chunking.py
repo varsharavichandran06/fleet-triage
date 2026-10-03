@@ -20,6 +20,7 @@ class Chunk:
     text: str
 
 
+# Each file is one document. The first paragraph is its title and the rest is the body.
 def _read_docs():
     for filename in sorted(os.listdir(DOCS_DIR)):
         if not filename.endswith(".txt"):
@@ -31,6 +32,8 @@ def _read_docs():
         yield filename, title.strip(), body.strip()
 
 
+# Windows advance by the window size minus the overlap, so neighbouring chunks
+# share CHUNK_OVERLAP_WORDS words. The last window can be shorter than the rest.
 def chunk_document(doc_id: str, doc_title: str, body: str) -> List[Chunk]:
     words = body.split()
     if not words:

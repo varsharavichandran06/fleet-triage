@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Verdict } from "@/lib/api";
 
+// Colour and label for each verdict. An unrecognised verdict uses the neutral style below.
 const VERDICT_TONE: Record<string, { label: string; cls: string; dot: string }> = {
   known_issue: {
     label: "Known issue",
@@ -10,7 +11,7 @@ const VERDICT_TONE: Record<string, { label: string; cls: string; dot: string }> 
     dot: "bg-emerald-500",
   },
   new_issue: {
-    label: "New issue — escalate",
+    label: "New issue - escalate",
     cls: "border-amber-300 bg-amber-50 text-amber-900",
     dot: "bg-amber-500",
   },
@@ -26,6 +27,7 @@ const VERDICT_TONE: Record<string, { label: string; cls: string; dot: string }> 
   },
 };
 
+// One row of the probability distribution. Width is clamped to 0..1 so a bad value cannot overflow the track.
 function Bar({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div className="flex items-center gap-2 text-[10px]">
@@ -43,6 +45,7 @@ function Bar({ label, value, tone }: { label: string; value: number; tone: strin
   );
 }
 
+// Pretty printed raw value. Shows the exact state and typed questions sent to the decision model, and the answers it returned.
 function Json({ value }: { value: unknown }) {
   return (
     <pre className="max-h-72 overflow-auto rounded-lg border border-neutral-200 bg-white p-2 font-mono text-[10px] leading-relaxed text-neutral-700">
@@ -51,6 +54,8 @@ function Json({ value }: { value: unknown }) {
   );
 }
 
+// The typed decision: verdict, confidence, the full probability distribution, the drain
+// recommendation, and the model's exact input and output behind a tab switch.
 export default function VerdictPanel({ v }: { v: Verdict }) {
   const [tab, setTab] = useState<"in" | "out">("in");
 
@@ -146,13 +151,13 @@ export default function VerdictPanel({ v }: { v: Verdict }) {
         <div className="space-y-3">
           <div>
             <p className="mb-1 text-[10px] uppercase tracking-wide text-neutral-400">
-              State — {evidence.length} retrieved chunks, {facts.length} graph facts
+              State - {evidence.length} retrieved chunks, {facts.length} graph facts
             </p>
             <Json value={v.request_state} />
           </div>
           <div>
             <p className="mb-1 text-[10px] uppercase tracking-wide text-neutral-400">
-              Questions — the typed schema the answer must conform to
+              Questions - the typed schema the answer must conform to
             </p>
             <Json value={v.request_questions} />
           </div>
@@ -160,7 +165,7 @@ export default function VerdictPanel({ v }: { v: Verdict }) {
       ) : (
         <div>
           <p className="mb-1 text-[10px] uppercase tracking-wide text-neutral-400">
-            Answers — typed values with their distributions, never free text
+            Answers - typed values with their distributions, never free text
           </p>
           <Json value={v.raw_answers} />
         </div>

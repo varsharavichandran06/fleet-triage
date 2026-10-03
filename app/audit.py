@@ -30,10 +30,13 @@ def log_event(run_id: str, step: str, data: Dict[str, Any]) -> None:
         "step": step,
         "data": data,
     }
+    # Append mode: earlier entries are never rewritten, so an interrupted run
+    # keeps everything it had already recorded.
     with open(_audit_path(run_id), "a") as f:
         f.write(json.dumps(entry) + "\n")
 
 
+# Each non blank line is one complete JSON entry, in the order it was written.
 def read_trail(run_id: str) -> List[Dict[str, Any]]:
     path = _audit_path(run_id)
     if not os.path.exists(path):

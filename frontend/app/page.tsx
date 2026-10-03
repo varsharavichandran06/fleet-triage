@@ -62,6 +62,7 @@ const STEP_LABELS: { key: StreamStep; label: string }[] = [
   { key: "synthesize", label: "Synthesis" },
 ];
 
+// Shows which pipeline stages have completed while a run is streaming.
 function StepProgress({
   done,
   running,
@@ -148,7 +149,7 @@ const SAMPLES = [
     text: "A node logged Xid 48 on one GPU partway through a 512 rank pretraining run. The device dropped out of the collective and took the whole job with it. Do we reset it or pull it?",
   },
   {
-    label: "Xid 13 — GPU or our code?",
+    label: "Xid 13 - GPU or our code?",
     text: "Job crashed with Xid 13 on one node. On call wants to drain the node but the workload owner says the code is fine. Which is it?",
   },
   {
@@ -172,6 +173,8 @@ export default function Home() {
   // Filled in step by step as the stream arrives, so sections can render
   // before the run has finished.
   const [result, setResult] = useState<Partial<TriageResult> | null>(null);
+  // Stages that have arrived over the stream. Sections use this to show either
+  // their data or a pending placeholder.
   const [done, setDone] = useState<Set<StreamStep>>(new Set());
   const [audit, setAudit] = useState<AuditEvent[]>([]);
 
@@ -183,6 +186,7 @@ export default function Home() {
     setAudit([]);
     setDone(new Set());
     try {
+      // Each pipeline stage arrives as its own event and fills its section as it lands.
       await runTriageStream(query, {
         onStep: (step, data) => {
           setResult((prev) => ({ ...(prev ?? {}), ...data }));

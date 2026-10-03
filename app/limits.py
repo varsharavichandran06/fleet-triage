@@ -69,11 +69,14 @@ def client_key(request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+# Drops request timestamps older than the one hour window. The per minute
+# count is taken from the timestamps that remain.
 def _prune(stamps: deque, now: float) -> None:
     while stamps and now - stamps[0] > 3600:
         stamps.popleft()
 
 
+# Day number in UTC. The daily budget resets whenever this value changes.
 def _today() -> int:
     return int(time.time() // 86400)
 
@@ -107,6 +110,7 @@ def check(request, *, api_key: Optional[str]) -> Optional[Rejection]:
                 retry_after=int((day + 1) * 86400 - now),
             )
 
+        # Key holders skip the per caller limits but still count toward the daily budget.
         if not privileged:
             stamps = _hits[client_key(request)]
             _prune(stamps, now)

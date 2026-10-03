@@ -8,7 +8,7 @@ down to the few chunks that actually matter.
 
 import logging
 import os
-from typing import List, Dict
+from typing import Dict
 from functools import lru_cache
 
 import chromadb
@@ -24,7 +24,7 @@ from app.config import (
     MIN_RERANK_SCORE,
     RRF_K,
 )
-from app.chunking import load_all_chunks, Chunk
+from app.chunking import load_all_chunks
 
 log = logging.getLogger(__name__)
 
@@ -118,16 +118,6 @@ def _keyword_search(query: str, k: int) -> Dict[str, float]:
     scores = bm25.get_scores(tokenized_query)
     ranked = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)[:k]
     return {c.chunk_id: float(s) for c, s in ranked if s > 0}
-
-
-def _normalize(scores: Dict[str, float]) -> Dict[str, float]:
-    if not scores:
-        return {}
-    values = list(scores.values())
-    lo, hi = min(values), max(values)
-    if hi == lo:
-        return {k: 1.0 for k in scores}
-    return {k: (v - lo) / (hi - lo) for k, v in scores.items()}
 
 
 def _normalize_max(scores: Dict[str, float]) -> Dict[str, float]:
@@ -308,8 +298,3 @@ def hybrid_search_detailed(query: str, top_k_final: int = TOP_K_FINAL):
     ]
     return final_chunks, stages
 
-
-def hybrid_search(query: str, top_k_final: int = TOP_K_FINAL) -> List[dict]:
-    """Thin wrapper kept for callers that only want the final chunks."""
-    final, _ = hybrid_search_detailed(query, top_k_final)
-    return final

@@ -112,19 +112,6 @@ export type AuditEvent = {
   data: Record<string, unknown>;
 };
 
-export async function runTriage(query: string, runId?: string): Promise<TriageResult> {
-  const res = await fetch(`${API_BASE}/triage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, run_id: runId }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Triage request failed (${res.status}): ${body}`);
-  }
-  return res.json();
-}
-
 export async function getAuditTrail(runId: string): Promise<AuditEvent[]> {
   const res = await fetch(`${API_BASE}/runs/${runId}/audit`);
   if (!res.ok) {

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from app.agent import run_triage, _checkpoint_path
 from app.audit import read_trail
 from app.llm import LLMError
-from app.config import RUNS_DIR, CORS_ORIGINS, MAX_QUERY_CHARS, ORIGIN_SECRET
+from app.config import CORS_ORIGINS, MAX_QUERY_CHARS, ORIGIN_SECRET
 from app import limits
 from app.logging_setup import setup_logging
 

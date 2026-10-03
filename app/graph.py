@@ -10,7 +10,6 @@ walks outward from them, returning the relations found as structured
 context to accompany the free text chunks from retrieval.
 """
 
-import json
 import logging
 from typing import List, Dict
 from neo4j import GraphDatabase

@@ -5,6 +5,8 @@ import type { Candidate, RetrievalStages } from "@/lib/api";
 
 // Fixed row geometry so the connector SVG can be drawn from arithmetic
 // instead of measuring the DOM after layout.
+// Layout for the two columns and the curves joining them. PITCH is one row
+// plus its gap, so row n sits at (n - 1) * PITCH.
 const ROW_H = 68;
 const GAP = 10;
 const PITCH = ROW_H + GAP;
@@ -104,6 +106,7 @@ export default function RerankFlow({ stages }: { stages: RetrievalStages }) {
 
   const n = cands.length;
   const svgH = n * PITCH - GAP;
+  // Vertical centre of the row for a 1-based rank.
   const yFor = (rank: number) => (rank - 1) * PITCH + ROW_H / 2;
 
   const moved = cands.filter((c) => c.rank_delta !== 0).length;

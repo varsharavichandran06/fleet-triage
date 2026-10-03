@@ -13,6 +13,7 @@ function classify(line: string): Kind {
   return "plain";
 }
 
+// Styling per line kind, so evidence and graph facts are easy to tell apart in the prompt.
 const STYLES: Record<Kind, string> = {
   chunk: "border-l-2 border-sky-400 bg-sky-50/60 text-neutral-700",
   fact: "border-l-2 border-violet-400 bg-violet-50/60 text-neutral-700",

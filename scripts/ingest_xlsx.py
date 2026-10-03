@@ -35,16 +35,15 @@ SHEET = "Documents"
 
 
 def row_to_text(row) -> tuple[str, str]:
-    doc_id, typ, title, area, sev, date, status, cause, resolution, related = (
+    doc_id, _type, title, _area, _sev, _date, _status, cause, resolution, related = (
         list(row) + [None] * 10
     )[:10]
 
     header = f"{doc_id}: {title}"
 
-    # Type/Area/Severity/Status/Date are not written into the body. They
-    # are around 15 words of near identical boilerplate per document, a
-    # quarter of a 60 word chunk spent on text that does not distinguish
-    # one document from another.
+    # Type, area, severity, status and date are not written into the body:
+    # they repeat across documents and do not help retrieval, and they would
+    # use a large share of each fixed size chunk.
     body_parts = []
     if cause:
         body_parts.append(f"What happened and cause: {cause}")

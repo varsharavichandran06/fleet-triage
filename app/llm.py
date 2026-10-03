@@ -30,6 +30,7 @@ class LLMError(RuntimeError):
     """
 
 
+# One shared client, created on first use, so every call reuses its connection pool.
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
@@ -164,11 +165,6 @@ def synthesize_triage_detailed(
         raise LLMError(f"LLM call failed during triage synthesis: {e}") from e
 
     return {"answer": resp.choices[0].message.content.strip(), "prompt": prompt}
-
-
-def synthesize_triage(query: str, chunks: List[dict], graph_facts: List[dict]) -> str:
-    """Thin wrapper kept for callers that only want the answer text."""
-    return synthesize_triage_detailed(query, chunks, graph_facts)["answer"]
 
 
 def _fallback_triage(query: str, chunks: List[dict], graph_facts: List[dict]) -> str:

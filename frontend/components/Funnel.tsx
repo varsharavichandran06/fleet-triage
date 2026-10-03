@@ -75,7 +75,7 @@ export default function Funnel({ stages }: { stages: RetrievalStages }) {
               <div className="flex h-7 items-center">
                 {s.count === 0 ? (
                   <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-semibold text-rose-700">
-                    0 — nothing cleared the relevance threshold
+                    0 - nothing cleared the relevance threshold
                   </span>
                 ) : (
                   <div

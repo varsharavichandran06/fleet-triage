@@ -8,7 +8,7 @@ inspected after the fact.
 
 The question it answers is the one that costs money to get wrong: is this a
 documented known issue, a new failure worth escalating, a bug in the
-workload, or an artifact of the test setup — and should the node be drained?
+workload, or an artifact of the test setup - and should the node be drained?
 
 ---
 
@@ -16,7 +16,7 @@ workload, or an artifact of the test setup — and should the node be drained?
 
 A single failure classification costs fractions of a cent and takes a
 fraction of a second either way, so per-call numbers understate what these
-choices actually mean — the table below shows them at a batch of 500
+choices actually mean - the table below shows them at a batch of 500
 classifications instead. What matters is that the ratios hold at any
 volume, and the volume is not small: Meta's published account of training
 Llama 3 405B put GPU-related interruptions at roughly one every three hours
@@ -37,12 +37,12 @@ thousands.
 - **Cut classification cost ~99% (~110x)** by billing the decision per
   classification rather than per token generated. That ratio is what
   compounds as event volume moves from hundreds a month to the tens of
-  thousands a multi-cluster fleet can produce — not the cents on any single
+  thousands a multi-cluster fleet can produce - not the cents on any single
   call.
 - **Increased classification throughput ~13x** by routing the decision
   through a purpose-built typed model instead of a general-purpose chat
   completion. At fleet scale that is a throughput multiplier, not a
-  convenience — the difference between a triage system that keeps pace
+  convenience - the difference between a triage system that keeps pace
   with a cluster failing every 30 minutes and one that falls behind it.
 - **Avoided an unnecessary infrastructure upgrade** by profiling actual
   resource usage against what had been provisioned before committing to
@@ -93,7 +93,7 @@ single verbose source cannot occupy every slot.
 
 Triples are extracted per document and merged into Neo4j on entity name.
 Entities above a degree cap, and a blocklist of generic nouns, are excluded
-both from query matching and from being walked through — without that, a
+both from query matching and from being walked through - without that, a
 common word like `node` becomes a hub joining hundreds of unrelated
 documents. Traversal runs to two hops, which is what lets an error code reach
 the component it affects and the remedy recorded for it:
@@ -166,29 +166,6 @@ synthesis stages are still running.
 
 ---
 
-## Layout
-
-```
-app/
-  main.py            FastAPI application
-  agent.py           four-step loop with checkpointing
-  retrieval.py       hybrid search, RRF fusion, reranking
-  graph.py           Neo4j triple storage and traversal
-  decide.py          typed verdict, Jev with a chat-model fallback
-  llm.py             language model wrapper
-  chunking.py        sliding window chunker
-  audit.py           per-run audit trail
-  logging_setup.py   logging configuration
-  config.py          configuration and tuning constants
-scripts/
-  ingest_xlsx.py     workbook -> text corpus
-  build_index.py     build the vector and keyword indexes
-  extract_graph.py   extract triples into Neo4j
-  eval_verdicts.py   verdict accuracy with and without retrieval
-frontend/            Next.js interface showing every pipeline stage
-```
-
----
 
 ## Deployment
 
@@ -196,7 +173,7 @@ The backend runs as a Docker container on a single EC2 instance, reached
 only through CloudFront: a custom origin header, checked on every request,
 means the instance refuses anything that did not come through the CDN, and
 the security group only accepts inbound traffic from CloudFront's own IP
-range. The instance has no SSH key and no open management port — it is
+range. The instance has no SSH key and no open management port - it is
 reached through SSM Session Manager, authenticated by IAM rather than a
 credential that can be lost or leaked.
 
@@ -213,7 +190,7 @@ through GitHub's OIDC federation rather than a stored AWS key.
 
 ## Security
 
-The API has no user accounts — a static frontend cannot hold a secret a
+The API has no user accounts - a static frontend cannot hold a secret a
 browser can't read back, so "auth" here means abuse resistance rather than
 login. Three things bound it: a daily cap on total runs across every
 caller, a per-caller rate limit, and a maximum query length, since
